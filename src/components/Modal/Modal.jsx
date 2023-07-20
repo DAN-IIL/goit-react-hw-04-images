@@ -1,39 +1,35 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
+import css from './Modal.module.css';
 
-import styles from './Modal.module.css';
+export default Modal;
 
-const modalRoot = document.querySelector("#modal-root");
+const modalRoot = document.querySelector('#modal-root');
 
+Modal.propTypes = { onClose: PropTypes.func.isRequired };
 
-const Modal = ({children, close}) => {
+function Modal({ onClose, children }) {
+  const closeModal = useCallback(
+    ({ code, currentTarget, target }) => {
+      if (code === 'Escape' || currentTarget === target) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
 
-    useEffect(() => {
-        const closeModal = ({ target, currentTarget, code }) => {
-            if (target === currentTarget || code === "Escape") close()
-        }
-            document.addEventListener('keydown', closeModal)
-            return () => {
-                document.removeEventListener("keydown", closeModal)
-            }
-        }, [close])
+  useEffect(() => {
+    window.addEventListener('keydown', closeModal);
+    return () => {
+      window.removeEventListener('keydown', closeModal);
+    };
+  }, [closeModal]);
 
-    return (
-createPortal(
-                // eslint-disable-next-line no-undef
-                <div className={styles.overlay} onClick={close}>
-                    <div className={styles.modal}>
-                        <span className={styles.close} onClick={close}>X</span>
-                        {children}
-                    </div>
-                </div>,
-                modalRoot    ))
+  return createPortal(
+    <div className={css.overlay} onClick={closeModal}>
+      <div className={css.modal}>{children}</div>
+    </div>,
+    modalRoot
+  );
 }
-
-Modal.propTypes = {
-    children: PropTypes.node.isRequired,
-    close: PropTypes.func.isRequired,
-  };
-  
-  export default Modal;

@@ -1,17 +1,17 @@
 import PropTypes from 'prop-types';
-import styles from './largeImage.module.css';
+import css from './largeImage.module.css';
 
-const LargeImage = ({ largeImageURL, tags }) => {
+export default Image;
+
+Image.propTypes = {
+  URL: PropTypes.string.isRequired,
+  tags: PropTypes.string,
+};
+
+function Image({ URL, tags = '' }) {
   return (
-    <div>
-          <img src={largeImageURL} alt={tags} className={styles.large_img} />
-    </div>
+    <>
+      <img className={css.image} src={URL} alt={tags}></img>
+    </>
   );
-};
-
-LargeImage.propTypes = {
-  largeImageURL: PropTypes.string.isRequired,
-  tags: PropTypes.string.isRequired,
-};
-
-export default LargeImage;
+}

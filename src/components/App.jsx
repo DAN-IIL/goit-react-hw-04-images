@@ -1,105 +1,111 @@
-import { useState, useEffect } from 'react';
-import { searchPhoto } from './api-search/api-search';
-import Searchbar from './Searchbar/Searchbar';
-import ImageGallery from './ImageGallery/ImageGallery';
-import Loader from './Loader/Loader';
-import Button from './Button/Button';
-import Modal from './Modal/Modal';
-import LargeImage from './LargeImage/LargeImage';
-import ButtonUp from './ButtonUp/ButtonUp';
-import Notiflix from 'notiflix';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getApiResponse, requestParameters } from './api-search/api-search.js';
+import Searchbar from './Searchbar/Searchbar.jsx';
+import ImageGallery from './ImageGallery/ImageGallery.jsx';
+import Button from './Button/Button.jsx';
+import Modal from './Modal/Modal.jsx';
+import Image from './LargeImage/LargeImage.jsx';
+import Loader from './Loader/Loader.jsx';
+import css from './App.module.css';
 
-const App = () => {
-  const [search, setSearch] = useState('');
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+export default App;
+
+function App() {
+  const [searchString, setSearchString] = useState('');
+  const [gallery, setGallery] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
-  const [showModal, setShowModal] = useState(false);
-  const [largeImage, setLargeImage] = useState(null);
-  const [prevSearch, setPrevSearch] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState('');
+  const [largeImageAlt, setLargeImageAlt] = useState('');
 
-  const searchItems = ( search ) => {
-    if (!search) {
-      Notiflix.Notify.info('Please, enter a search query.');
-      return;
-    }
+  const prevSearchString = useRef('');
+  const prevGallery = useRef([]);
 
-    if (search === prevSearch) {
-      Notiflix.Notify.info('Please, change your search query.');
-      return;
-    }
-    setSearch(search);
-    setItems([]);
-    setPage(1);
-    setPrevSearch(search);
-  };
+  const updateGallery = useCallback(
+    searchString => {
+      try {
+        getApiResponse(searchString).then(response => {
+          if (response.totalHits === 0) {
+            alert(`Images by your request "${searchString}" did not found`);
+            return;
+          } else {
+            setGallery([...prevGallery.current, ...response.hits]);
+          }
+        });
+      } catch (error) {
+        setError(error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [prevGallery]
+  );
 
   useEffect(() => {
-    const fetchPhotos = async () => {
-      try {
-        setLoading(true);
-        if (search) {
-          const data = await searchPhoto(search, page);
-          setItems(prevItems => [...prevItems, ...data.hits]);
-        }
-      } catch (error) {
-        setError(error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-      fetchPhotos();
-  }, [search, page]);
+    if (prevSearchString.current !== searchString) {
+      requestParameters.page = 1;
+      setGallery([]);
+      prevGallery.current = [];
 
-  const loadMore = () => {
-    setPage(prevPage => prevPage + 1);
+      if (searchString !== '') {
+        setIsLoading(true);
+        updateGallery(searchString);
+      }
+    }
+
+    prevSearchString.current = searchString;
+  }, [searchString, updateGallery]);
+
+  useEffect(() => {
+    prevGallery.current = gallery;
+  }, [gallery]);
+
+  const loadNextPage = () => {
+    setIsLoading(true);
+    updateGallery(searchString);
   };
 
-  const showLargeImage = ({ largeImageURL, tags }) => {
-    setLargeImage({
-      largeImageURL,
-      tags,
-    });
-    setShowModal(true);
+  const getSearchString = value => {
+    if (searchString !== value.searchString) {
+      setSearchString(value.searchString);
+    } else {
+      alert(`You are actually looking at "${value.searchString}" pictures`);
+    }
+  };
+
+  const openModal = ({ largeImageURL, tags }) => {
+    setIsModalOpen(true);
+    setLargeImageURL(largeImageURL);
+    setLargeImageAlt(tags);
   };
 
   const closeModal = () => {
-    setLargeImage(null);
-    setShowModal(false);
-  };
-
-  const handleScrollUp = e => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
+    setIsModalOpen(false);
+    setLargeImageURL('');
+    setLargeImageAlt('');
   };
 
   return (
-    <div
-      style={{
-        height: '100vh',
-        display: 'block',
-        justifyContent: 'center',
-        alignItems: 'center',
-        fontSize: 40,
-        color: '#010101',
-      }}
-    >
-      <Searchbar onSubmit={searchItems} />
-      <ImageGallery items={items} showLargeImage={showLargeImage} />
-      {loading && <Loader />}
-      {error && <p>{error}</p>}
-      {Boolean(items.length) && <Button onClick={loadMore} />}
-      {items.length > 12 && <ButtonUp onClick={handleScrollUp} />}
-      {showModal && (
-        <Modal close={closeModal}>
-          <LargeImage {...largeImage} />
+    <div className={css.app}>
+      <Searchbar onSubmit={getSearchString} />
+
+      {isLoading && requestParameters.page === 1 ? (
+        <Loader />
+      ) : (error !== null ? (<p>{error}</p>):
+        gallery.length > 0 && (
+          <ImageGallery gallery={gallery} onClick={openModal} />
+        )
+      )}
+
+      {requestParameters.page !== 1 &&
+        (isLoading ? <Loader /> : <Button onClick={loadNextPage} />)}
+
+      {isModalOpen && (
+        <Modal onClose={closeModal}>
+          <Image URL={largeImageURL} tags={largeImageAlt} />
         </Modal>
       )}
     </div>
   );
-};
-
-export default App;
+}
